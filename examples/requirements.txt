@@ -1,0 +1,10 @@
+# Python dependencies for DuckDB and Streamlit examples
+
+# Core dependencies
+duckdb>=0.8.0
+pandas>=1.5.0
+streamlit>=1.22.0
+plotly>=5.13.0
+
+# Optional dependencies
+pyarrow>=11.0.0  # For better Parquet support

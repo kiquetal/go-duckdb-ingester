@@ -1,0 +1,55 @@
+# Prometheus Metrics Collector Configuration
+
+# Debug mode enables more verbose logging and shorter collection intervals (1 minute instead of 24 hours)
+debug: false
+
+# List of API proxies to collect metrics for
+apiProxies:
+  - "api-proxy-1"
+  - "api-proxy-2"
+  - "api-proxy-3"
+
+# Prometheus connection settings
+prometheus:
+  # Prometheus server URL
+  url: "http://prometheus:9090"
+  
+  # Timeout for Prometheus API requests (in seconds)
+  timeout: 30s
+  
+  # Optional basic auth credentials
+  # username: "prometheus"
+  # password: "secret"
+  
+  # Metrics to collect
+  metrics:
+    - name: "request_count"
+      # Use %s as a placeholder for the API proxy name
+      query: 'sum(increase(apigee_request_count{apiproxy="%s"}[1d])) by (apiproxy, environment)'
+      labels:
+        - "apiproxy"
+        - "environment"
+    
+    - name: "response_time"
+      query: 'avg(apigee_response_time_ms{apiproxy="%s"}) by (apiproxy, environment)'
+      labels:
+        - "apiproxy"
+        - "environment"
+    
+    - name: "error_count"
+      query: 'sum(increase(apigee_error_count{apiproxy="%s"}[1d])) by (apiproxy, environment, error_type)'
+      labels:
+        - "apiproxy"
+        - "environment"
+        - "error_type"
+
+# Storage configuration
+storage:
+  # Directory where Parquet files will be stored
+  outputDir: "./data"
+  
+  # Compression algorithm (snappy, gzip, lz4, zstd)
+  compression: "snappy"
+  
+  # Row group size in bytes (default: 128MB)
+  rowGroupSize: 134217728
