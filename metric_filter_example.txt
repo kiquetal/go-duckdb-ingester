@@ -1,0 +1,51 @@
+# Prometheus Metrics and Filters Example
+
+## Metrics Being Collected
+
+This project collects the following metrics from Prometheus:
+
+1. **request_count**: Counts the number of API requests
+2. **response_time**: Measures the average response time in milliseconds
+3. **error_count**: Counts the number of errors
+
+## How Filters Are Used
+
+Filters are applied in the PromQL queries to target specific API proxies. The main filter used is `apiproxy="name"` which limits the metrics to a specific API proxy.
+
+## Example Queries
+
+### Request Count Query
+```
+sum(increase(apigee_request_count{apiproxy="api-proxy-1"}[1d])) by (apiproxy, environment)
+```
+
+This query:
+- Counts requests for "api-proxy-1" only
+- Measures the increase over a 1-day period
+- Groups results by apiproxy and environment
+
+### Response Time Query
+```
+avg(apigee_response_time_ms{apiproxy="api-proxy-2"}) by (apiproxy, environment)
+```
+
+This query:
+- Measures average response time for "api-proxy-2" only
+- Groups results by apiproxy and environment
+
+### Error Count Query
+```
+sum(increase(apigee_error_count{apiproxy="api-proxy-3"}[1d])) by (apiproxy, environment, error_type)
+```
+
+This query:
+- Counts errors for "api-proxy-3" only
+- Measures the increase over a 1-day period
+- Groups results by apiproxy, environment, and error_type
+
+## How It Works in the Application
+
+1. The application reads the list of API proxies from the configuration
+2. For each API proxy, it runs each metric query, replacing the placeholder with the actual API proxy name
+3. The results are stored in Parquet files, organized by date and API proxy
+4. These files can then be analyzed using DuckDB and visualized with Streamlit
