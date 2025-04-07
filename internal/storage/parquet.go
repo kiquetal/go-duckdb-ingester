@@ -8,7 +8,7 @@ import (
 
 	"github.com/kiquetal/go-duckdb-ingester/internal/prometheus"
 	"github.com/kiquetal/go-duckdb-ingester/pkg/config"
-	"github.com/xitongsys/parquet-go-source/l
+	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/parquet"
 	"github.com/xitongsys/parquet-go/writer"
 )
