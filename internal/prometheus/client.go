@@ -3,6 +3,7 @@ package prometheus
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/kiquetal/go-duckdb-ingester/pkg/config"
@@ -23,6 +24,13 @@ type MetricResult struct {
 	Timestamp time.Time
 	Value     float64
 	Labels    map[string]string
+}
+
+// TimeRange represents a time range for querying metrics
+type TimeRange struct {
+	Start time.Time
+	End   time.Time
+	Step  time.Duration
 }
 
 // NewClient creates a new Prometheus client
@@ -51,70 +59,225 @@ func NewClient(cfg config.PrometheusConfig) (*Client, error) {
 
 // CollectMetrics gathers metrics for a specific API proxy
 func (c *Client) CollectMetrics(apiProxy string) ([]MetricResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.config.Timeout)
-	defer cancel()
+	// Use channels to collect results and errors from goroutines
+	resultsChan := make(chan []MetricResult, len(c.config.Metrics))
+	errorsChan := make(chan error, len(c.config.Metrics))
+	warningsChan := make(chan []string, len(c.config.Metrics))
 
-	var results []MetricResult
+	// Create a wait group to wait for all goroutines to finish
+	var wg sync.WaitGroup
 
-	// Collect each configured metric
+	// Launch a goroutine for each metric
 	for _, metricCfg := range c.config.Metrics {
-		// Replace placeholder in query with actual API proxy name
-		query := replaceAPIProxyInQuery(metricCfg.Query, apiProxy)
+		wg.Add(1)
+		go func(cfg config.MetricConfig) {
+			defer wg.Done()
 
-		// Execute query
-		result, warnings, err := c.api.Query(ctx, query, time.Now())
-		if err != nil {
-			return nil, fmt.Errorf("error querying Prometheus: %w", err)
-		}
+			// Replace placeholder in query with actual API proxy name
+			query := replaceAPIProxyInQuery(cfg.Query, apiProxy)
 
-		if len(warnings) > 0 {
-			fmt.Printf("Warnings: %v\n", warnings)
-		}
+			// Execute query with its own context
+			queryCtx, queryCancel := context.WithTimeout(context.Background(), c.config.Timeout)
+			defer queryCancel()
 
-		// Process results
-		switch result.Type() {
-		case model.ValVector:
-			vector := result.(model.Vector)
-			for _, sample := range vector {
-				metricResult := MetricResult{
-					Name:      metricCfg.Name,
-					Timestamp: sample.Timestamp.Time(),
-					Value:     float64(sample.Value),
-					Labels:    make(map[string]string),
-				}
-
-				// Extract labels
-				for labelName, labelValue := range sample.Metric {
-					metricResult.Labels[string(labelName)] = string(labelValue)
-				}
-
-				results = append(results, metricResult)
+			result, warnings, err := c.api.Query(queryCtx, query, time.Now())
+			if err != nil {
+				errorsChan <- fmt.Errorf("error querying Prometheus for metric %s: %w", cfg.Name, err)
+				return
 			}
-		case model.ValMatrix:
-			matrix := result.(model.Matrix)
-			for _, stream := range matrix {
-				for _, point := range stream.Values {
+
+			if len(warnings) > 0 {
+				warningsChan <- warnings
+			}
+
+			var metricResults []MetricResult
+
+			// Process results
+			switch result.Type() {
+			case model.ValVector:
+				vector := result.(model.Vector)
+				for _, sample := range vector {
 					metricResult := MetricResult{
-						Name:      metricCfg.Name,
-						Timestamp: point.Timestamp.Time(),
-						Value:     float64(point.Value),
+						Name:      cfg.Name,
+						Timestamp: sample.Timestamp.Time(),
+						Value:     float64(sample.Value),
 						Labels:    make(map[string]string),
 					}
 
 					// Extract labels
-					for labelName, labelValue := range stream.Metric {
+					for labelName, labelValue := range sample.Metric {
 						metricResult.Labels[string(labelName)] = string(labelValue)
 					}
 
-					results = append(results, metricResult)
+					metricResults = append(metricResults, metricResult)
 				}
+			case model.ValMatrix:
+				matrix := result.(model.Matrix)
+				for _, stream := range matrix {
+					for _, point := range stream.Values {
+						metricResult := MetricResult{
+							Name:      cfg.Name,
+							Timestamp: point.Timestamp.Time(),
+							Value:     float64(point.Value),
+							Labels:    make(map[string]string),
+						}
+
+						// Extract labels
+						for labelName, labelValue := range stream.Metric {
+							metricResult.Labels[string(labelName)] = string(labelValue)
+						}
+
+						metricResults = append(metricResults, metricResult)
+					}
+				}
+			default:
+				errorsChan <- fmt.Errorf("unsupported result type for metric %s: %s", cfg.Name, result.Type().String())
+				return
 			}
-		default:
-			return nil, fmt.Errorf("unsupported result type: %s", result.Type().String())
-		}
+
+			resultsChan <- metricResults
+		}(metricCfg)
 	}
 
-	return results, nil
+	// Close channels when all goroutines are done
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+		close(errorsChan)
+		close(warningsChan)
+	}()
+
+	// Collect all results and errors
+	var allResults []MetricResult
+	var allErrors []error
+
+	// Process warnings
+	for warnings := range warningsChan {
+		fmt.Printf("Warnings: %v\n", warnings)
+	}
+
+	// Process errors
+	for err := range errorsChan {
+		allErrors = append(allErrors, err)
+	}
+
+	// Process results
+	for results := range resultsChan {
+		allResults = append(allResults, results...)
+	}
+
+	// Return error if any occurred
+	if len(allErrors) > 0 {
+		return nil, fmt.Errorf("errors occurred while collecting metrics: %v", allErrors)
+	}
+
+	return allResults, nil
+}
+
+// CollectMetricsRange gathers metrics for a specific API proxy over a time range
+func (c *Client) CollectMetricsRange(apiProxy string, timeRange TimeRange) ([]MetricResult, error) {
+	// Use channels to collect results and errors from goroutines
+	resultsChan := make(chan []MetricResult, len(c.config.Metrics))
+	errorsChan := make(chan error, len(c.config.Metrics))
+	warningsChan := make(chan []string, len(c.config.Metrics))
+
+	// Create a wait group to wait for all goroutines to finish
+	var wg sync.WaitGroup
+
+	// Launch a goroutine for each metric
+	for _, metricCfg := range c.config.Metrics {
+		wg.Add(1)
+		go func(cfg config.MetricConfig) {
+			defer wg.Done()
+
+			// Replace placeholder in query with actual API proxy name
+			query := replaceAPIProxyInQuery(cfg.Query, apiProxy)
+
+			// Execute query with its own context
+			queryCtx, queryCancel := context.WithTimeout(context.Background(), c.config.Timeout)
+			defer queryCancel()
+
+			// Execute range query
+			r := v1.Range{
+				Start: timeRange.Start,
+				End:   timeRange.End,
+				Step:  timeRange.Step,
+			}
+			result, warnings, err := c.api.QueryRange(queryCtx, query, r)
+			if err != nil {
+				errorsChan <- fmt.Errorf("error querying Prometheus range for metric %s: %w", cfg.Name, err)
+				return
+			}
+
+			if len(warnings) > 0 {
+				warningsChan <- warnings
+			}
+
+			var metricResults []MetricResult
+
+			// Process results
+			switch result.Type() {
+			case model.ValMatrix:
+				matrix := result.(model.Matrix)
+				for _, stream := range matrix {
+					for _, point := range stream.Values {
+						metricResult := MetricResult{
+							Name:      cfg.Name,
+							Timestamp: point.Timestamp.Time(),
+							Value:     float64(point.Value),
+							Labels:    make(map[string]string),
+						}
+
+						// Extract labels
+						for labelName, labelValue := range stream.Metric {
+							metricResult.Labels[string(labelName)] = string(labelValue)
+						}
+
+						metricResults = append(metricResults, metricResult)
+					}
+				}
+			default:
+				errorsChan <- fmt.Errorf("unsupported result type for range query for metric %s: %s", cfg.Name, result.Type().String())
+				return
+			}
+
+			resultsChan <- metricResults
+		}(metricCfg)
+	}
+
+	// Close channels when all goroutines are done
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+		close(errorsChan)
+		close(warningsChan)
+	}()
+
+	// Collect all results and errors
+	var allResults []MetricResult
+	var allErrors []error
+
+	// Process warnings
+	for warnings := range warningsChan {
+		fmt.Printf("Warnings: %v\n", warnings)
+	}
+
+	// Process errors
+	for err := range errorsChan {
+		allErrors = append(allErrors, err)
+	}
+
+	// Process results
+	for results := range resultsChan {
+		allResults = append(allResults, results...)
+	}
+
+	// Return error if any occurred
+	if len(allErrors) > 0 {
+		return nil, fmt.Errorf("errors occurred while collecting range metrics: %v", allErrors)
+	}
+
+	return allResults, nil
 }
 
 // replaceAPIProxyInQuery replaces the {apiproxy="..."} placeholder in the query

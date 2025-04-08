@@ -20,6 +20,12 @@ type Config struct {
 
 	// Storage configuration
 	Storage StorageConfig `yaml:"storage"`
+
+	// StartTime is the start time for range queries (set via command line)
+	StartTime time.Time `yaml:"-"`
+
+	// EndTime is the end time for range queries (set via command line)
+	EndTime time.Time `yaml:"-"`
 }
 
 // PrometheusConfig contains Prometheus connection settings
@@ -36,6 +42,12 @@ type PrometheusConfig struct {
 
 	// Metrics is a list of Prometheus metrics to collect
 	Metrics []MetricConfig `yaml:"metrics"`
+
+	// UseRangeQuery determines whether to use range queries
+	UseRangeQuery bool `yaml:"useRangeQuery,omitempty"`
+
+	// RangeStep is the step interval for range queries (e.g., "1h")
+	RangeStep time.Duration `yaml:"rangeStep,omitempty"`
 }
 
 // MetricConfig defines a specific Prometheus metric to collect
@@ -77,6 +89,10 @@ func LoadConfig(path string) (*Config, error) {
 	// Set defaults
 	if cfg.Prometheus.Timeout == 0 {
 		cfg.Prometheus.Timeout = 30 * time.Second
+	}
+
+	if cfg.Prometheus.RangeStep == 0 {
+		cfg.Prometheus.RangeStep = 1 * time.Hour // Default to 1 hour step
 	}
 
 	if cfg.Storage.Compression == "" {

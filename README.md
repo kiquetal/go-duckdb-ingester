@@ -82,6 +82,12 @@ prometheus:
   # username: "prometheus"
   # password: "secret"
 
+  # Use range query instead of instant query
+  # useRangeQuery: true
+
+  # Step interval for range queries (e.g., "1h" for hourly data)
+  # rangeStep: 1h
+
   # Metrics to collect
   metrics:
     - name: "request_count"
@@ -124,6 +130,43 @@ The collector will:
 2. Query metrics for each specified API proxy
 3. Store the results in Parquet files with daily partitioning
 4. By default, collect metrics every 24 hours
+
+#### Using Range Queries
+
+You can use range queries to collect metrics for a specific time range with a defined step interval. This is useful for obtaining values for a specific day divided by hour:
+
+```bash
+# Collect hourly metrics for a specific day
+./metrics-collector --config config/config.yaml --range --start="2025-04-07T00:00:00Z" --end="2025-04-08T00:00:00Z"
+```
+
+This will:
+1. Query Prometheus for metrics over the specified time range (24 hours in this example)
+2. Use a step interval of 1 hour (default, can be configured in config.yaml)
+3. Store the hourly data points in Parquet files
+
+You can also enable range queries in the configuration file:
+
+```yaml
+prometheus:
+  # ... other settings ...
+  useRangeQuery: true
+  rangeStep: 1h  # 1 hour step interval
+```
+
+#### Memory Optimization for Large Time Ranges
+
+When querying large time ranges (e.g., an entire day or more), the application automatically processes data in batches to reduce memory consumption. This is especially important when dealing with historical data.
+
+The application:
+1. Divides the specified time range into smaller batches (6-hour chunks)
+2. Processes each batch sequentially
+3. Creates separate Parquet files for each batch with timestamps in the filename
+4. Performs garbage collection between batches to free up memory
+
+This approach significantly reduces memory usage compared to processing the entire time range at once.
+
+For more details on command line flags and memory optimization, see [README_FLAGS.md](README_FLAGS.md).
 
 The Parquet files will be stored in the configured output directory with the following structure:
 
@@ -257,6 +300,12 @@ You can create custom Streamlit dashboards by:
 3. **Streamlit dashboard errors**:
    - Check Python dependencies are installed
    - Verify data directory path is correct
+
+4. **High memory usage**:
+   - When querying large time ranges (e.g., an entire day or more), the application may consume a lot of memory
+   - Use the built-in batching feature by specifying start and end times with the `--range` flag
+   - For extremely large datasets, consider reducing the batch size in the code (currently set to 6 hours)
+   - If querying multiple API proxies, consider running them one at a time with separate commands
 
 ## License
 

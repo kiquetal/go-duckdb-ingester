@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
+	"time" // Used for time.Time methods on metric.Timestamp
 
 	"github.com/kiquetal/go-duckdb-ingester/internal/prometheus"
 	"github.com/kiquetal/go-duckdb-ingester/pkg/config"
@@ -73,25 +73,34 @@ func (s *ParquetStorage) StoreMetrics(metrics []prometheus.MetricResult, filenam
 	}
 	pw.CompressionType = compressionType
 
-	// Extract date from the first metric or use current date
-	date := time.Now().Format("2006-01-02")
-	if len(metrics) > 0 {
-		date = metrics[0].Timestamp.Format("2006-01-02")
-	}
+	// Extract API proxy from directory structure (app=<apiProxy>)
+	dirPath := filepath.Dir(filename)
+	// Get the parent directory which should be app=<apiProxy>
+	appDir := filepath.Base(dirPath)
+	apiProxy := ""
 
-	// Extract API proxy from filename
-	apiProxy := filepath.Base(filename)
-	apiProxy = apiProxy[:len(apiProxy)-len(filepath.Ext(apiProxy))] // Remove extension
+	// Check if the directory starts with "app="
+	if len(appDir) > 4 && appDir[:4] == "app=" {
+		apiProxy = appDir[4:] // Extract the apiProxy part
+	} else {
+		// Fall back to the old method if we can't find the app part
+		apiProxy = filepath.Base(filename)
+		apiProxy = apiProxy[:len(apiProxy)-len(filepath.Ext(apiProxy))] // Remove extension
+	}
 
 	// Write metrics to Parquet file
 	for _, metric := range metrics {
+		// Derive the date from each record's timestamp using RFC3339 date format
+		// Use UTC to ensure consistent date regardless of local timezone
+		recordDate := metric.Timestamp.UTC().Format(time.DateOnly)
+
 		record := MetricRecord{
 			Timestamp:  metric.Timestamp.UnixMilli(),
 			MetricName: metric.Name,
 			Value:      metric.Value,
 			ApiProxy:   apiProxy,
 			Labels:     metric.Labels,
-			Date:       date,
+			Date:       recordDate,
 		}
 
 		if err := pw.Write(record); err != nil {
