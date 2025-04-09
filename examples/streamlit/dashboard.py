@@ -139,7 +139,7 @@ if not selected_api_proxies:
     st.stop()
 
 # Metric selection
-metrics = ["request_count", "response_time", "error_count"]
+metrics = ["request_count"]
 selected_metrics = st.sidebar.multiselect(
     "Metrics",
     options=metrics,
@@ -212,6 +212,10 @@ if data is None or len(data) == 0:
     st.error("No data found for the selected filters.")
     st.stop()
 
+# Convert labels to readable format
+if 'labels' in data.columns:
+    data['labels'] = data['labels'].apply(lambda x: str(x) if x else '')
+
 # Display data overview
 st.subheader("Data Overview")
 st.write(f"Loaded {len(data)} records from {len(selected_dates)} days for {len(selected_api_proxies)} API proxies.")
@@ -238,38 +242,6 @@ with tab1:
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No request count data available for the selected filters.")
-
-    if "response_time" in selected_metrics:
-        st.write("### Response Time Over Time")
-        response_data = data[data["metric_name"] == "response_time"]
-        if len(response_data) > 0:
-            fig = px.line(
-                response_data,
-                x="timestamp",
-                y="value",
-                color="api_proxy",
-                title="Response Time Over Time",
-                labels={"value": "Response Time (ms)", "timestamp": "Time", "api_proxy": "API Proxy"}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No response time data available for the selected filters.")
-
-    if "error_count" in selected_metrics:
-        st.write("### Error Count Over Time")
-        error_data = data[data["metric_name"] == "error_count"]
-        if len(error_data) > 0:
-            fig = px.line(
-                error_data,
-                x="timestamp",
-                y="value",
-                color="api_proxy",
-                title="Error Count Over Time",
-                labels={"value": "Error Count", "timestamp": "Time", "api_proxy": "API Proxy"}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No error count data available for the selected filters.")
 
 with tab2:
     st.subheader("Aggregated Metrics")
@@ -309,67 +281,81 @@ with tab2:
         else:
             st.info("No request count data available for the selected filters.")
 
-    # Average response time by API proxy and date
-    if "response_time" in selected_metrics:
-        st.write("### Average Response Time by API Proxy and Date")
-        avg_response_time = conn.execute("""
-        SELECT 
-            date,
-            api_proxy,
-            AVG(value) as avg_response_time_ms
-        FROM metrics_data
-        WHERE metric_name = 'response_time'
-        GROUP BY date, api_proxy
-        ORDER BY date, avg_response_time_ms DESC
-        """).fetchdf()
-
-        if len(avg_response_time) > 0:
-            fig = px.bar(
-                avg_response_time,
-                x="api_proxy",
-                y="avg_response_time_ms",
-                color="date",
-                barmode="group",
-                title="Average Response Time by API Proxy and Date",
-                labels={"avg_response_time_ms": "Avg Response Time (ms)", "api_proxy": "API Proxy", "date": "Date"}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(avg_response_time)
-        else:
-            st.info("No response time data available for the selected filters.")
-
-    # Error count by API proxy and date
-    if "error_count" in selected_metrics:
-        st.write("### Error Count by API Proxy and Date")
-        error_counts = conn.execute("""
-        SELECT 
-            date,
-            api_proxy,
-            SUM(value) as error_count
-        FROM metrics_data
-        WHERE metric_name = 'error_count'
-        GROUP BY date, api_proxy
-        ORDER BY date, error_count DESC
-        """).fetchdf()
-
-        if len(error_counts) > 0:
-            fig = px.bar(
-                error_counts,
-                x="api_proxy",
-                y="error_count",
-                color="date",
-                barmode="group",
-                title="Error Count by API Proxy and Date",
-                labels={"error_count": "Error Count", "api_proxy": "API Proxy", "date": "Date"}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(error_counts)
-        else:
-            st.info("No error count data available for the selected filters.")
-
 with tab3:
     st.subheader("Raw Data")
-    st.dataframe(data)
+
+    # Initialize session state for pagination if not already set
+    if 'page_size' not in st.session_state:
+        st.session_state.page_size = 25
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 1
+
+    # Add pagination controls
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        page_size = st.selectbox(
+            "Rows per page",
+            options=[10, 25, 50, 100],
+            index=[10, 25, 50, 100].index(st.session_state.page_size)
+        )
+        # Update session state if page size changes
+        if page_size != st.session_state.page_size:
+            st.session_state.page_size = page_size
+            st.session_state.current_page = 1  # Reset to first page when changing page size
+
+    # Calculate total pages
+    total_rows = len(data)
+    total_pages = max(1, (total_rows - 1) // page_size + 1)
+
+    # Ensure current page is valid
+    if st.session_state.current_page > total_pages:
+        st.session_state.current_page = total_pages
+
+    # Add page navigation
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col1:
+        current_page = st.number_input(
+            "Page",
+            min_value=1,
+            max_value=total_pages,
+            value=st.session_state.current_page,
+            step=1
+        )
+        # Update session state if page number changes
+        if current_page != st.session_state.current_page:
+            st.session_state.current_page = current_page
+    with col3:
+        st.write(f"Total: {total_rows} rows, {total_pages} pages")
+
+    # Calculate start and end indices
+    start_idx = (st.session_state.current_page - 1) * page_size
+    end_idx = min(start_idx + page_size, total_rows)
+
+    # Display current page of data
+    st.dataframe(data.iloc[start_idx:end_idx])
+
+    # Add page navigation buttons
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    with col1:
+        if st.session_state.current_page > 1:
+            if st.button("⏮️ First"):
+                st.session_state.current_page = 1
+                st.rerun()
+    with col2:
+        if st.session_state.current_page > 1:
+            if st.button("◀️ Previous"):
+                st.session_state.current_page -= 1
+                st.rerun()
+    with col3:
+        if st.session_state.current_page < total_pages:
+            if st.button("Next ▶️"):
+                st.session_state.current_page += 1
+                st.rerun()
+    with col4:
+        if st.session_state.current_page < total_pages:
+            if st.button("Last ⏭️"):
+                st.session_state.current_page = total_pages
+                st.rerun()
 
 # Footer
 st.markdown("---")
