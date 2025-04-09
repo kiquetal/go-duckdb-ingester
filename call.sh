@@ -2,7 +2,7 @@ PROMETHEUS_URL="http://localhost:9080"
 START_TIME="2025-04-08T00:00:00Z"
 END_TIME="2025-04-08T23:59:59Z"
 STEP="3600s"
-APP_NAME="memento"
+APP_NAME="ice-validator-v1"
 
 # This query uses a 1-hour time window [1h] to calculate the increase in requests
 # For longer-term trends with more smoothing, consider using [1d] instead

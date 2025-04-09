@@ -6,6 +6,7 @@ debug: false
 # List of API proxies to collect metrics for
 apiProxies:
   - "memento"
+  - "ice-validator-v1"
 
 
 

@@ -72,6 +72,8 @@ func (s *ParquetStorage) StoreMetrics(metrics []prometheus.MetricResult, filenam
 			apiProxy := ""
 			if val, ok := metric.Labels["apiproxy"]; ok {
 				apiProxy = val
+			} else if val, ok := metric.Labels["app"]; ok { // Fallback to "app" label
+				apiProxy = val
 			}
 
 			record := MetricRecord{
