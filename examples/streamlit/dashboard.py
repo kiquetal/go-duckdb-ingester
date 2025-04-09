@@ -280,17 +280,18 @@ with tab2:
     # Register the DataFrame as a table
     conn.register("metrics_data", data)
 
-    # Total requests by API proxy
+    # Total requests by API proxy and date
     if "request_count" in selected_metrics:
-        st.write("### Total Requests by API Proxy")
+        st.write("### Total Requests by API Proxy and Date")
         total_requests = conn.execute("""
         SELECT 
+            date,
             api_proxy,
             SUM(value) as total_requests
         FROM metrics_data
         WHERE metric_name = 'request_count'
-        GROUP BY api_proxy
-        ORDER BY total_requests DESC
+        GROUP BY date, api_proxy
+        ORDER BY date, total_requests DESC
         """).fetchdf()
 
         if len(total_requests) > 0:
@@ -298,25 +299,28 @@ with tab2:
                 total_requests,
                 x="api_proxy",
                 y="total_requests",
-                title="Total Requests by API Proxy",
-                labels={"total_requests": "Total Requests", "api_proxy": "API Proxy"}
+                color="date",
+                barmode="group",
+                title="Total Requests by API Proxy and Date",
+                labels={"total_requests": "Total Requests", "api_proxy": "API Proxy", "date": "Date"}
             )
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(total_requests)
         else:
             st.info("No request count data available for the selected filters.")
 
-    # Average response time by API proxy
+    # Average response time by API proxy and date
     if "response_time" in selected_metrics:
-        st.write("### Average Response Time by API Proxy")
+        st.write("### Average Response Time by API Proxy and Date")
         avg_response_time = conn.execute("""
         SELECT 
+            date,
             api_proxy,
             AVG(value) as avg_response_time_ms
         FROM metrics_data
         WHERE metric_name = 'response_time'
-        GROUP BY api_proxy
-        ORDER BY avg_response_time_ms DESC
+        GROUP BY date, api_proxy
+        ORDER BY date, avg_response_time_ms DESC
         """).fetchdf()
 
         if len(avg_response_time) > 0:
@@ -324,25 +328,28 @@ with tab2:
                 avg_response_time,
                 x="api_proxy",
                 y="avg_response_time_ms",
-                title="Average Response Time by API Proxy",
-                labels={"avg_response_time_ms": "Avg Response Time (ms)", "api_proxy": "API Proxy"}
+                color="date",
+                barmode="group",
+                title="Average Response Time by API Proxy and Date",
+                labels={"avg_response_time_ms": "Avg Response Time (ms)", "api_proxy": "API Proxy", "date": "Date"}
             )
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(avg_response_time)
         else:
             st.info("No response time data available for the selected filters.")
 
-    # Error count by API proxy
+    # Error count by API proxy and date
     if "error_count" in selected_metrics:
-        st.write("### Error Count by API Proxy")
+        st.write("### Error Count by API Proxy and Date")
         error_counts = conn.execute("""
         SELECT 
+            date,
             api_proxy,
             SUM(value) as error_count
         FROM metrics_data
         WHERE metric_name = 'error_count'
-        GROUP BY api_proxy
-        ORDER BY error_count DESC
+        GROUP BY date, api_proxy
+        ORDER BY date, error_count DESC
         """).fetchdf()
 
         if len(error_counts) > 0:
@@ -350,8 +357,10 @@ with tab2:
                 error_counts,
                 x="api_proxy",
                 y="error_count",
-                title="Error Count by API Proxy",
-                labels={"error_count": "Error Count", "api_proxy": "API Proxy"}
+                color="date",
+                barmode="group",
+                title="Error Count by API Proxy and Date",
+                labels={"error_count": "Error Count", "api_proxy": "API Proxy", "date": "Date"}
             )
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(error_counts)
