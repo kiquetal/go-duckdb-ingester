@@ -72,6 +72,8 @@ def get_available_dates(data_dir):
 @st.cache_data
 def get_available_api_proxies(data_dir, selected_dates):
     api_proxies = set()
+
+    # First try to get API proxies from the selected dates
     for date in selected_dates:
         # Parse the date to get year, month, day
         year, month, day = date.split('-')
@@ -85,6 +87,19 @@ def get_available_api_proxies(data_dir, selected_dates):
                     # Extract the app name from the directory name
                     app_name = app_dir.split("=")[1]
                     api_proxies.add(app_name)
+
+    # If no API proxies found for selected dates, get all available API proxies from all dates
+    if not api_proxies:
+        # Use available_dates to find API proxies
+        for date in available_dates:
+            year, month, day = date.split('-')
+            day_path = os.path.join(data_dir, f"year={year}", f"month={month}", f"day={day}")
+
+            if os.path.exists(day_path):
+                for app_dir in os.listdir(day_path):
+                    if app_dir.startswith("app="):
+                        app_name = app_dir.split("=")[1]
+                        api_proxies.add(app_name)
 
     return sorted(list(api_proxies))
 
@@ -104,8 +119,7 @@ date_range = st.sidebar.date_input(
         datetime.strptime(available_dates[-1], "%Y-%m-%d").date(),
         datetime.strptime(available_dates[0], "%Y-%m-%d").date()
     ),
-    min_value=datetime.strptime(available_dates[-1], "%Y-%m-%d").date(),
-    max_value=datetime.strptime(available_dates[0], "%Y-%m-%d").date(),
+    # Allow selecting any date by removing min_value and max_value restrictions
 )
 
 # Convert date range to list of date strings
@@ -118,8 +132,9 @@ if isinstance(date_range, tuple) and len(date_range) == 2:
 else:
     selected_dates = [date_range.strftime("%Y-%m-%d")]
 
-# Filter to dates that actually have data
-selected_dates = [date for date in selected_dates if date in available_dates]
+# Keep all selected dates, even if they don't appear in available_dates
+# This allows selecting dates like 2025-04-06 even if they're not detected automatically
+# selected_dates = [date for date in selected_dates if date in available_dates]
 
 # Get available API proxies for selected dates
 available_api_proxies = get_available_api_proxies(data_dir, selected_dates)
@@ -242,7 +257,20 @@ with st.spinner("Loading data..."):
     data = load_data(data_dir, selected_dates, selected_api_proxies, selected_metrics)
 
 if data is None or len(data) == 0:
-    st.error("No data found for the selected filters.")
+    st.error(f"""
+    No data found for the selected filters.
+
+    Selected dates: {', '.join(selected_dates)}
+    Selected API proxies: {', '.join(selected_api_proxies)}
+
+    Possible reasons:
+    1. The data directory structure doesn't match the expected format (year=YYYY/month=MM/day=DD/app=NAME).
+    2. There are no Parquet files in the expected locations.
+    3. The selected date range doesn't contain any data.
+
+    Try selecting different dates or check if the data exists in the expected location:
+    {data_dir}/year=YYYY/month=MM/day=DD/app=NAME/*.parquet
+    """)
     st.stop()
 
 # Convert labels to readable format
