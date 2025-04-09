@@ -164,8 +164,14 @@ func collectAndStore(client *prometheus.Client, store *storage.ParquetStorage, c
 				// Store metrics in parquet file with recommended partitioning structure
 				// year=YYYY/month=MM/day=DD/app=apiProxy/metrics_HHMMSS_HHMMSS.parquet
 				// Create a unique filename for each batch to avoid memory issues
+				// Use the batch start time for file partitioning to ensure each day's data
+				// is stored in the correct folder, especially when the query spans multiple days
+				batchYear := batchStart.Format("2006")
+				batchMonth := batchStart.Format("01")
+				batchDay := batchStart.Format("02")
+
 				batchFilename := fmt.Sprintf("%s/year=%s/month=%s/day=%s/app=%s/metrics_%s_%s.parquet",
-					cfg.Storage.OutputDir, year, month, day, apiProxy,
+					cfg.Storage.OutputDir, batchYear, batchMonth, batchDay, apiProxy,
 					batchStart.Format("150405"), batchEnd.Format("150405"))
 
 				// Measure time for Parquet file writing
