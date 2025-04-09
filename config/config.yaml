@@ -7,6 +7,7 @@ debug: false
 apiProxies:
   - "memento"
   - "ice-validator-v1"
+  - "tigo-mobile-py-kannel-v1"
 
 
 
