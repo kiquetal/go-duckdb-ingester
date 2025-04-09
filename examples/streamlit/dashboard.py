@@ -138,6 +138,39 @@ if not selected_api_proxies:
     st.warning("Please select at least one API proxy.")
     st.stop()
 
+# API Proxy Color Customization
+st.sidebar.subheader("API Proxy Colors")
+st.sidebar.markdown("Customize the colors for each API proxy:")
+
+# Initialize color map in session state if not already set
+if 'api_proxy_colors' not in st.session_state:
+    st.session_state.api_proxy_colors = {}
+
+# Default colors for API proxies (a list of distinct colors)
+default_colors = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+]
+
+# Add color pickers for each selected API proxy
+for i, api_proxy in enumerate(selected_api_proxies):
+    # Use default color if not already set
+    if api_proxy not in st.session_state.api_proxy_colors:
+        st.session_state.api_proxy_colors[api_proxy] = default_colors[i % len(default_colors)]
+
+    # Add color picker
+    color = st.sidebar.color_picker(
+        f"{api_proxy}",
+        value=st.session_state.api_proxy_colors[api_proxy]
+    )
+
+    # Update color in session state
+    st.session_state.api_proxy_colors[api_proxy] = color
+
+# Create color mapping dictionary for Plotly
+color_map = {api_proxy: st.session_state.api_proxy_colors[api_proxy]
+             for api_proxy in selected_api_proxies}
+
 # Metric selection
 metrics = ["request_count"]
 selected_metrics = st.sidebar.multiselect(
@@ -236,6 +269,7 @@ with tab1:
                 x="timestamp",
                 y="value",
                 color="api_proxy",
+                color_discrete_map=color_map,
                 title="Request Count Over Time",
                 labels={"value": "Request Count", "timestamp": "Time", "api_proxy": "API Proxy"}
             )
@@ -269,9 +303,10 @@ with tab2:
         if len(total_requests) > 0:
             fig = px.bar(
                 total_requests,
-                x="api_proxy",
+                x="date",
                 y="total_requests",
-                color="date",
+                color="api_proxy",
+                color_discrete_map=color_map,
                 barmode="group",
                 title="Total Requests by API Proxy and Date",
                 labels={"total_requests": "Total Requests", "api_proxy": "API Proxy", "date": "Date"}
