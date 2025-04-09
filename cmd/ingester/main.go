@@ -93,6 +93,7 @@ func main() {
 }
 
 func collectAndStore(client *prometheus.Client, store *storage.ParquetStorage, cfg *config.Config) {
+	totalStartTime := time.Now()
 	log.Printf("Collecting metrics for API proxies: %v", cfg.APIProxies)
 
 	// Determine the date to use for file partitioning
@@ -144,7 +145,12 @@ func collectAndStore(client *prometheus.Client, store *storage.ParquetStorage, c
 					Step:  cfg.Prometheus.RangeStep,
 				}
 
+				// Measure time for Prometheus query
+				queryStartTime := time.Now()
 				metrics, err := client.CollectMetricsRange(apiProxy, timeRange)
+				queryDuration := time.Since(queryStartTime)
+				log.Printf("Prometheus range query for %s took %s", apiProxy, queryDuration)
+
 				if err != nil {
 					log.Printf("Error collecting metrics for %s: %v", apiProxy, err)
 					continue
@@ -162,10 +168,15 @@ func collectAndStore(client *prometheus.Client, store *storage.ParquetStorage, c
 					cfg.Storage.OutputDir, year, month, day, apiProxy,
 					batchStart.Format("150405"), batchEnd.Format("150405"))
 
+				// Measure time for Parquet file writing
+				writeStartTime := time.Now()
 				if err := store.StoreMetrics(metrics, batchFilename); err != nil {
 					log.Printf("Error storing metrics for %s: %v", apiProxy, err)
+					// Continue processing even if there's an error
+					log.Printf("Continuing to next batch despite error...")
 				} else {
-					log.Printf("Successfully stored metrics for %s in %s", apiProxy, batchFilename)
+					writeDuration := time.Since(writeStartTime)
+					log.Printf("Successfully stored metrics for %s in %s (took %s)", apiProxy, batchFilename, writeDuration)
 				}
 
 				// Force garbage collection to free up memory
@@ -183,7 +194,13 @@ func collectAndStore(client *prometheus.Client, store *storage.ParquetStorage, c
 		} else {
 			// Use instant query
 			log.Printf("Collecting metrics for %s using instant query", apiProxy)
+
+			// Measure time for Prometheus query
+			queryStartTime := time.Now()
 			metrics, err := client.CollectMetrics(apiProxy)
+			queryDuration := time.Since(queryStartTime)
+			log.Printf("Prometheus instant query for %s took %s", apiProxy, queryDuration)
+
 			if err != nil {
 				log.Printf("Error collecting metrics for %s: %v", apiProxy, err)
 				continue
@@ -193,11 +210,21 @@ func collectAndStore(client *prometheus.Client, store *storage.ParquetStorage, c
 			// year=YYYY/month=MM/day=DD/app=apiProxy/metrics.parquet
 			filename := fmt.Sprintf("%s/year=%s/month=%s/day=%s/app=%s/metrics.parquet",
 				cfg.Storage.OutputDir, year, month, day, apiProxy)
+
+			// Measure time for Parquet file writing
+			writeStartTime := time.Now()
 			if err := store.StoreMetrics(metrics, filename); err != nil {
 				log.Printf("Error storing metrics for %s: %v", apiProxy, err)
+				// Continue processing even if there's an error
+				log.Printf("Continuing to next API proxy despite error...")
 			} else {
-				log.Printf("Successfully stored metrics for %s in %s", apiProxy, filename)
+				writeDuration := time.Since(writeStartTime)
+				log.Printf("Successfully stored metrics for %s in %s (took %s)", apiProxy, filename, writeDuration)
 			}
 		}
 	}
+
+	// Log total time taken for the entire collection and storage process
+	totalDuration := time.Since(totalStartTime)
+	log.Printf("Total time for collecting and storing metrics: %s", totalDuration)
 }

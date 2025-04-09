@@ -3,6 +3,7 @@ package prometheus
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -153,7 +154,7 @@ func (c *Client) CollectMetrics(apiProxy string) ([]MetricResult, error) {
 
 	// Process warnings
 	for warnings := range warningsChan {
-		fmt.Printf("Warnings: %v\n", warnings)
+		log.Printf("Warnings: %v", warnings)
 	}
 
 	// Process errors
@@ -259,7 +260,7 @@ func (c *Client) CollectMetricsRange(apiProxy string, timeRange TimeRange) ([]Me
 
 	// Process warnings
 	for warnings := range warningsChan {
-		fmt.Printf("Warnings: %v\n", warnings)
+		log.Printf("Warnings: %v", warnings)
 	}
 
 	// Process errors

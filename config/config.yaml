@@ -49,3 +49,6 @@ storage:
 
   # Row group size in bytes (default: 128MB)
   rowGroupSize: 134217728
+
+  # Timeout for finalizing Parquet files (default: 180s)
+  writeStopTimeout: 180s

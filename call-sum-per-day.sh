@@ -1,8 +1,8 @@
 #!/bin/bash
 
 PROMETHEUS_URL="http://localhost:9080"
-START_TIME="2025-04-07T00:00:00Z"
-END_TIME="2025-04-07T23:59:59Z"
+START_TIME="2025-04-08T00:00:00Z"
+END_TIME="2025-04-08T23:59:59Z"
 APP_NAME="memento"
 
 # Query to get the total number of requests for the day

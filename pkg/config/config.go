@@ -72,6 +72,9 @@ type StorageConfig struct {
 
 	// RowGroupSize controls the Parquet row group size
 	RowGroupSize int64 `yaml:"rowGroupSize"`
+
+	// WriteStopTimeout is the timeout duration for finalizing Parquet files
+	WriteStopTimeout time.Duration `yaml:"writeStopTimeout"`
 }
 
 // LoadConfig loads the configuration from a YAML file
@@ -101,6 +104,10 @@ func LoadConfig(path string) (*Config, error) {
 
 	if cfg.Storage.RowGroupSize == 0 {
 		cfg.Storage.RowGroupSize = 128 * 1024 * 1024 // 128MB default
+	}
+
+	if cfg.Storage.WriteStopTimeout == 0 {
+		cfg.Storage.WriteStopTimeout = 180 * time.Second // 3 minutes default
 	}
 
 	// Validate required fields
