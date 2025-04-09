@@ -92,10 +92,9 @@ prometheus:
   metrics:
     - name: "request_count"
       # Use %s as a placeholder for the API proxy name
-      query: 'sum(increase(apigee_request_count{apiproxy="%s"}[1d])) by (apiproxy, environment)'
+      query: 'sum(increase(istio_requests_total{app="%s"}[1h])) by (app)'
       labels:
-        - "apiproxy"
-        - "environment"
+        - "app"
 
 # Storage configuration
 storage:
@@ -300,7 +299,7 @@ To add new metrics:
    ```yaml
    metrics:
      - name: "new_metric"
-       query: 'your_promql_query{apiproxy="%s"}'
+       query: 'your_promql_query{app="%s"}'
        labels:
          - "label1"
          - "label2"
