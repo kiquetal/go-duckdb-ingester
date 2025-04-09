@@ -115,6 +115,39 @@ storage:
 2. **Prometheus Metrics**: Define the metrics to collect with their PromQL queries
 3. **Storage**: Configure where and how to store the Parquet files
 
+### Understanding Time Windows in Prometheus Queries
+
+In the metrics configuration, you'll notice the use of time windows like `[1h]` or `[1d]` in the PromQL queries. These time windows have significant implications for your metrics:
+
+#### Time Window in `increase()` Function
+
+The query `sum(increase(istio_requests_total{app="%s"}[1h])) by (app)` uses a 1-hour time window, while `sum(increase(istio_requests_total{app="%s"}[1d])) by (app)` uses a 1-day time window.
+
+**What's the difference?**
+
+- **`[1h]` (1 hour window)**:
+  - Calculates the increase in the counter over the last hour
+  - More granular, showing short-term trends
+  - Less smoothing, may show more variability
+  - Better for detecting short-term spikes or drops
+  - Useful when you need to react quickly to changes
+
+- **`[1d]` (1 day window)**:
+  - Calculates the increase in the counter over the last day (24 hours)
+  - Less granular, showing longer-term trends
+  - More smoothing, reduces the impact of short-term variability
+  - Better for understanding overall daily patterns
+  - Useful for daily reporting and long-term trend analysis
+
+**When to use each:**
+
+- Use `[1h]` when you need more detailed, responsive metrics that can show recent changes
+- Use `[1d]` when you want a more stable view that smooths out hourly fluctuations
+
+**Note:** When using range queries with a step interval (e.g., `rangeStep: 1h`), the time window (`[1h]` or `[1d]`) and the step interval are independent settings:
+- The time window determines how much historical data is used to calculate each data point
+- The step interval determines how frequently data points are sampled in the time range
+
 ## Usage
 
 ### Running the Metrics Collector

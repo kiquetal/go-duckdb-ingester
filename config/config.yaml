@@ -31,6 +31,9 @@ prometheus:
   metrics:
     - name: "request_count"
       # Use %s as a placeholder for the API proxy name
+      # The [1h] time window calculates the increase over the last hour
+      # For longer-term trends with more smoothing, consider using [1d] instead
+      # See README.md section "Understanding Time Windows in Prometheus Queries" for details
       query: 'sum(increase(istio_requests_total{app="%s"}[1h])) by (app)'
       labels:
         - "app"
