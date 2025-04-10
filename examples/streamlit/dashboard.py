@@ -344,6 +344,14 @@ with tab2:
         else:
             st.info("No request count data available for the selected filters.")
 
+        st.title("Max requests per day per API proxy")
+        st.write("Here I'll put the maximum  request per day per API proxy")
+
+        max_requests = conn.execute("""
+
+
+
+
 with tab3:
     st.subheader("Raw Data")
 
