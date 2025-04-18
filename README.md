@@ -1,5 +1,31 @@
 # Prometheus Metrics Collector with DuckDB and Streamlit Integration
 
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+  - [Go Application](#go-application)
+  - [Python Dependencies](#python-dependencies)
+- [Configuration](#configuration)
+  - [Configuration Options](#configuration-options)
+  - [Key Configuration Points](#key-configuration-points)
+  - [Understanding Time Windows in Prometheus Queries](#understanding-time-windows-in-prometheus-queries)
+- [Usage](#usage)
+  - [Running the Metrics Collector](#running-the-metrics-collector)
+  - [Querying Metrics with DuckDB](#querying-metrics-with-duckdb)
+- [Memory Optimization Details](#memory-optimization-details)
+  - [DuckDB Query Examples](#duckdb-query-examples)
+  - [Visualizing Metrics with Streamlit](#visualizing-metrics-with-streamlit)
+- [Extending the Solution](#extending-the-solution)
+  - [Adding New Metrics](#adding-new-metrics)
+  - [Custom Dashboards](#custom-dashboards)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+- [License](#license)
+
 ## Architecture Overview
 
 This project consists of three main components:
