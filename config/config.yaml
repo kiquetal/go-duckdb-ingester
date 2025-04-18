@@ -8,7 +8,7 @@ apiProxies:
   - "memento"
   - "ice-validator-v1"
   - "tigo-mobile-py-kannel-v1"
-
+  - "tigo-mobile-pa-kannel-v1"
 
 
 # Prometheus connection settings
@@ -36,7 +36,7 @@ prometheus:
       # The [1h] time window calculates the increase over the last hour
       # For longer-term trends with more smoothing, consider using [1d] instead
       # See README.md section "Understanding Time Windows in Prometheus Queries" for details
-      query: 'sum(increase(istio_requests_total{app="%s"}[1h])) by (app)'
+      query: 'sum(increase(istio_requests_total{app="%s"}[1h] )) by (app)'
       labels:
         - "app"
 

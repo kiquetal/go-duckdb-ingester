@@ -347,7 +347,6 @@ with tab2:
         st.title("Max requests per day per API proxy")
         st.write("Here I'll put the maximum  request per day per API proxy")
 
-        max_requests = conn.execute("""
 
 
 

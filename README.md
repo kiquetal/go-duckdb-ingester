@@ -1,6 +1,12 @@
 # Prometheus Metrics Collector with DuckDB and Streamlit Integration
 
-This project provides a solution for collecting Prometheus metrics for specific API proxies, storing them in Parquet files, and analyzing them using DuckDB and Streamlit.
+## Architecture Overview
+
+This project consists of three main components:
+
+1. **Go Metrics Collector**: A Go application that queries Prometheus metrics for specified API proxies and stores them in Parquet files
+2. **DuckDB Integration**: Leveraging DuckDB to efficiently query and analyze the Parquet data files
+3. **Streamlit Dashboard**: Interactive visualization layer for exploring and analyzing the collected metrics
 
 ## Features
 
@@ -172,48 +178,18 @@ You can use range queries to collect metrics for a specific time range with a de
 ./metrics-collector --config config/config.yaml --range --start="2025-04-07T00:00:00Z" --end="2025-04-08T00:00:00Z"
 ```
 
-This will:
-1. Query Prometheus for metrics over the specified time range (24 hours in this example)
-2. Use a step interval of 1 hour (default, can be configured in config.yaml)
-3. Store the hourly data points in Parquet files
-
-You can also enable range queries in the configuration file:
-
-```yaml
-prometheus:
-  # ... other settings ...
-  useRangeQuery: true
-  rangeStep: 1h  # 1 hour step interval
-```
-
-#### Memory Optimization for Large Time Ranges
-
-When querying large time ranges (e.g., an entire day or more), the application automatically processes data in batches to reduce memory consumption. This is especially important when dealing with historical data.
-
-The application:
-1. Divides the specified time range into smaller batches (6-hour chunks)
-2. Processes each batch sequentially
-3. Creates separate Parquet files for each batch with timestamps in the filename
-4. Performs garbage collection between batches to free up memory
-
-This approach significantly reduces memory usage compared to processing the entire time range at once.
-
-For more details on command line flags and memory optimization, see [README_FLAGS.md](README_FLAGS.md).
-
-The Parquet files will be stored in the configured output directory with the following structure:
-
-```
-data/
-  ├── 2023-04-01/
-  │   ├── api-proxy-1.parquet
-  │   ├── api-proxy-2.parquet
-  │   └── api-proxy-3.parquet
-  ├── 2023-04-02/
-  │   ├── api-proxy-1.parquet
-  │   ├── api-proxy-2.parquet
-  │   └── api-proxy-3.parquet
-  └── ...
-```
+The collector will:
+1. Query Prometheus for each specified API proxy
+2. Process data in memory-efficient batches (for large time ranges)
+3. Store results in Parquet files with Hive-style partitioning:
+   ```
+   data/
+   └── year=YYYY/
+       └── month=MM/
+           └── day=DD/
+               └── app=api-proxy-name/
+                   └── metrics.parquet (or metrics_HHMMSS_HHMMSS.parquet for batches)
+   ```
 
 ### Querying Metrics with DuckDB
 
@@ -224,13 +200,21 @@ cd examples/duckdb
 python query_metrics.py --data-dir ../../data --last-days 7
 ```
 
-Options:
-- `--data-dir`: Directory containing the Parquet files
-- `--date`: Specific date to query (YYYY-MM-DD)
-- `--last-days`: Query data from the last N days
-- `--api-proxy`: Filter by specific API proxy
-- `--metric`: Filter by specific metric name
-- `--output`: Save results to CSV file
+Dashboard Features:
+- Date range selection with automatic detection of available dates
+- API proxy filtering with customizable colors
+- Time series visualization for all selected metrics
+- Aggregation views for comparing metrics across API proxies
+- Raw data browser with pagination
+
+## Memory Optimization Details
+
+For large time ranges, the collector automatically:
+
+1. Divides queries into 6-hour batches to reduce memory consumption
+2. Processes each batch sequentially
+3. Creates separate Parquet files for each batch
+4. Performs garbage collection between batches
 
 ### DuckDB Query Examples
 
