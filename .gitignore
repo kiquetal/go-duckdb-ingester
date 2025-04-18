@@ -2,3 +2,4 @@
 python-codes/.venv
 main
 metrics-collector
+data/**/*.parquet
